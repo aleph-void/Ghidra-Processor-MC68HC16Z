@@ -23,25 +23,35 @@
 <processor_spec>
   <programcounter register="PC"/>
   <!-- ================================================================
-       Context Data: Default Extension Register Values
-       
-       Derived from reset vector at address 0x0000:
-         Word 0x0FF1  EK=0x0, ZK=0xF, SK=0xF, PK=0x1
-       
-       EK is never modified at runtime in the target firmware
-       (no LDEK, TDP, or TEDPK instructions present; only PSHM/PULM K
-       for save/restore). The static default is therefore valid for all
-       code in the binary.
-       
-       If future firmware variants write EK dynamically, this must be
-       replaced with globalset() propagation in the slaspec.
+       Default extension fields: EK (extended addressing) and ZK (,Z modes)
+
+       Derived from the JTEC+ reset vector at address 0x0000:
+         Word 0x0FF1  ZK=0xF, SK=0xF, PK=0x1 (reset clears EK)
+       EK is not changed at run time in that firmware (only PSHM/PULM K
+       save and restore it).
+
+       Two settings carry them:
+         - tracked_set EK/ZK: the values the decompiler assumes at each
+           function entry. The p-code reads the EK and ZK registers, as the
+           CPU does, so a function that changes them (TBEK, TBZK, TXZ,
+           PULM K...) is followed; Set Register Values on EK/ZK overrides the
+           default for a range.
+         - context_set ctxEK: the bank the listing shows for EXT operands
+           (the 20-bit address printed next to the instruction). ctxZK is
+           no longer read by the instruction set; it is kept so existing
+           projects that set it still load.
+       Keep EK and ctxEK in step when you change a default.
        ================================================================ -->
   <context_data>
     <context_set space="ram">
         <set name="ctxEK" val="0"/>
-        <set name="ctxZK" val="15"/> 
+        <set name="ctxZK" val="15"/>
     </context_set>
-</context_data>
+    <tracked_set space="ram">
+        <set name="EK" val="0"/>
+        <set name="ZK" val="15"/>
+    </tracked_set>
+  </context_data>
 	<volatile outputop="write_volatile" inputop="read_volatile">
     	<range space="ram" first="0x0FF700" last="0x0FF73F"/>  <!-- ADC -->
     	<range space="ram" first="0x0FF820" last="0x0FF83F"/>  <!-- MRM -->
