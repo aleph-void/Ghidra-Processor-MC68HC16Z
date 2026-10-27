@@ -1,6 +1,6 @@
 """Generates 68HC16_PSHM_PULM.sinc: one sub-constructor per PSHM/PULM mask value.
 
-    python3 68HC16_PSHM_PULM.sinc.py      (writes 68HC16_PSHM_PULM.sinc next to this file)
+    python3 68HC16_PSHM_PULM.sinc.py [out]   (default: 68HC16_PSHM_PULM.sinc next to this file)
 
 CPU16 Reference Manual, PSHM and PULM glossary pages:
   PSHM: for mask bits 0 to 7, if the bit is set, push the register; bit 0 = D, 1 = E, 2 = IX, 3 = IY,
@@ -51,4 +51,6 @@ def generate(filename):
 
 
 if __name__ == "__main__":
-    generate(os.path.join(os.path.dirname(os.path.abspath(__file__)), "68HC16_PSHM_PULM.sinc"))
+    import sys
+    generate(sys.argv[1] if len(sys.argv) > 1 else
+             os.path.join(os.path.dirname(os.path.abspath(__file__)), "68HC16_PSHM_PULM.sinc"))

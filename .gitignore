@@ -9,6 +9,7 @@ ghidra_*/                 # unpacked Ghidra installs (e.g. for the test harness)
 
 # ── Test harness scratch ─────────────────────────────────────────────
 tests/generated/
+__pycache__/
 
 # ── Java / build ─────────────────────────────────────────────────────
 *.class
