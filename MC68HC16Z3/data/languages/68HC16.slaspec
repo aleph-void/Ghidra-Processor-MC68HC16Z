@@ -1361,6 +1361,8 @@ IND20Z: ext20_bank^":"^ext20_addr^",Z"  is ext20_pad=0 & ext20_bank & ext20_addr
 
 # = IDIV =
 :IDIV   is op8=0x37; op8b=0x2A  {
+    # (D) / (IX) => IX, remainder => D. IX = 0: IX = $FFFF, D indeterminate (left unchanged), no
+    # exception (M68HC11 compatibility). Z reflects the resulting IX in both cases (CPU16RM IDIV page).
     C_flag = (IX == 0);
     V_flag = 0;
     if (IX == 0) goto <divzero>;
@@ -1368,11 +1370,11 @@ IND20Z: ext20_bank^":"^ext20_addr^",Z"  is ext20_pad=0 & ext20_bank & ext20_addr
     local divisor:2 = IX;
     IX = dividend / divisor;
     D = dividend % divisor;
-    Z_flag = (IX == 0);
     goto <done>;
     <divzero>
     IX = 0xFFFF;
     <done>
+    Z_flag = (IX == 0);
 }
 
 # = FDIV =
