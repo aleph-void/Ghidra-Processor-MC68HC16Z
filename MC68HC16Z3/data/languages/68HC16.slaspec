@@ -296,22 +296,26 @@ EXT16: reloc  is addr16 & ctxEK  [ reloc = (ctxEK << 16) | addr16; ]
 # = Accumulator E Offset (E,X / E,Y / E,Z) =
 # Sign-extended E added to index register
 
-EOFFX: E,IX  is E & IX  { local ea:3 = (zext(XK:1) << 16) | zext(IX + E); export ea; }
-EOFFY: E,IY  is E & IY  { local ea:3 = (zext(YK:1) << 16) | zext(IY + E); export ea; }
-EOFFZ: E,IZ  is E & IZ & ctxZK  { local bank:1 = ctxZK; local ea:3 = (zext(bank) << 16) | zext(IZ + E); export ea; }
+EOFFX: "E,X"  is epsilon  { local ea:3 = (zext(XK:1) << 16) | zext(IX + E); export ea; }
+EOFFY: "E,Y"  is epsilon  { local ea:3 = (zext(YK:1) << 16) | zext(IY + E); export ea; }
+EOFFZ: "E,Z"  is ctxZK  { local bank:1 = ctxZK; local ea:3 = (zext(bank) << 16) | zext(IZ + E); export ea; }
 
 # = Relative Addressing =
-# CPU16 pipeline: branch offsets are ALWAYS relative to inst_start + 6 (3-word prefetch)
-REL8ADDR: reloc  is rel8   [ reloc = inst_start + 6 + rel8; ]   { export *:1 reloc; }
-REL16ADDR: reloc is rel16  [ reloc = inst_start + 6 + rel16; ]  { export *:1 reloc; }
+# CPU16 pipeline: branch offsets are ALWAYS relative to inst_start + 6 (3-word prefetch).
+# PK:PC is a 20-bit counter (bank carries wrap at 1 MB) and is word aligned: an odd offset is
+# rounded down (CPU16RM 5.6.1 note), hence the & 0xFFFFE.
+REL8ADDR: reloc  is rel8   [ reloc = (inst_start + 6 + rel8) & 0xFFFFE; ]   { export *:1 reloc; }
+REL16ADDR: reloc is rel16  [ reloc = (inst_start + 6 + rel16) & 0xFFFFE; ]  { export *:1 reloc; }
 
 # = Branch targets for BRCLR/BRSET (use different token slots) =
-BRREL8: reloc  is rel8_3  [ reloc = inst_start + 6 + rel8_3; ]  { export *:1 reloc; }
-BRREL16: reloc is rel16_2 [ reloc = inst_start + 6 + rel16_2; ] { export *:1 reloc; }
+BRREL8: reloc  is rel8_3  [ reloc = (inst_start + 6 + rel8_3) & 0xFFFFE; ]  { export *:1 reloc; }
+BRREL16: reloc is rel16_2 [ reloc = (inst_start + 6 + rel16_2) & 0xFFFFE; ] { export *:1 reloc; }
 
 # = Extended 20-bit (EXT20) - for JMP/JSR =
 # ext20_pad must be 0 to disambiguate from BRSET/BRCLR sharing same opcodes
-EXT20ADDR: reloc  is ext20_pad=0 & ext20_bank & ext20_addr [ reloc = (ext20_bank << 16) | ext20_addr; ]
+# The CPU fetches words, so an odd address in the operand is executed from the even address below it
+# (shown as that even address, like the branch targets).
+EXT20ADDR: reloc  is ext20_pad=0 & ext20_bank & ext20_addr [ reloc = ((ext20_bank << 16) | ext20_addr) & 0xFFFFE; ]
     { export *:3 reloc; }
 
 # = 20-bit Indexed (IND20) - for JMP/JSR =
@@ -667,7 +671,7 @@ IND20Z: ext20_bank^":"^ext20_addr^",Z"  is ext20_pad=0 & ext20_bank & ext20_addr
 :ADDD IND8X     is op8=0x81; IND8X     { local val:2 = *:2 IND8X; addFlags16(D, val); D = D + val; setNZ16(D); }
 :ADDD IND8Y     is op8=0x91; IND8Y     { local val:2 = *:2 IND8Y; addFlags16(D, val); D = D + val; setNZ16(D); }
 :ADDD IND8Z     is op8=0xA1; IND8Z     { local val:2 = *:2 IND8Z; addFlags16(D, val); D = D + val; setNZ16(D); }
-:ADDD "#"^imm8  is op8=0xFC; imm8      { local val:2 = sext(imm8:1); addFlags16(D, val); D = D + val; setNZ16(D); }
+:ADDD "#"^simm8 is op8=0xFC; simm8     { local val:2 = sext(simm8:1); addFlags16(D, val); D = D + val; setNZ16(D); }
 :ADDD "#"^imm16 is op8=0x37; op8b=0xB1; imm16  { local val:2 = imm16; addFlags16(D, val); D = D + val; setNZ16(D); }
 :ADDD IND16X    is op8=0x37; op8b=0xC1; IND16X  { local val:2 = *:2 IND16X; addFlags16(D, val); D = D + val; setNZ16(D); }
 :ADDD IND16Y    is op8=0x37; op8b=0xD1; IND16Y  { local val:2 = *:2 IND16Y; addFlags16(D, val); D = D + val; setNZ16(D); }
