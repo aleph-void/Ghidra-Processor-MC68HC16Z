@@ -1810,47 +1810,51 @@ IND20Z: ext20_bank^":"^ext20_addr^",Z"  is ext20_pad=0 & ext20_bank & ext20_addr
 # SECTION: MOVB / MOVW  (Block Move)
 # ============================================================================
 
-# MOVB IXP to EXT: (XK:IX) => M(EXT); IX = IX + sext(ff)
-:MOVB imm8^",X,"^addr16  is op8=0x30; imm8; addr16 {
+# MOVB IXP to EXT: (XK:IX) => M(EXT); XK:IX = XK:IX + sext(ff) (20-bit, CPU16RM 4.3.7)
+:MOVB simm8^",X,"^addr16  is op8=0x30; simm8; addr16 {
     local src:3 = (zext(XK:1) << 16) | zext(IX:2);
     local bank:1 = EK;
     local dst:3 = (zext(bank) << 16) | zext(addr16:2);
     local val:1 = *:1 src;
     *:1 dst = val;
-    IX = IX + sext(imm8:1);
+    local ixpv:3 = sext(simm8:1);
+    add20(XK, IX, ixpv);
     setNZ8(val); V_flag = 0;
 }
 
 # MOVB EXT to IXP: (M(EXT)) => (XK:IX); IX = IX + sext(ff)
-:MOVB addr16^","^imm8^",X"  is op8=0x32; imm8; addr16 {
+:MOVB addr16^","^simm8^",X"  is op8=0x32; simm8; addr16 {
     local dst:3 = (zext(XK:1) << 16) | zext(IX:2);
     local bank:1 = EK;
     local src:3 = (zext(bank) << 16) | zext(addr16:2);
     local val:1 = *:1 src;
     *:1 dst = val;
-    IX = IX + sext(imm8:1);
+    local ixpv:3 = sext(simm8:1);
+    add20(XK, IX, ixpv);
     setNZ8(val); V_flag = 0;
 }
 
 # MOVW IXP to EXT
-:MOVW imm8^",X,"^addr16  is op8=0x31; imm8; addr16 {
+:MOVW simm8^",X,"^addr16  is op8=0x31; simm8; addr16 {
     local src:3 = (zext(XK:1) << 16) | zext(IX:2);
     local bank:1 = EK;
     local dst:3 = (zext(bank) << 16) | zext(addr16:2);
     local val:2 = *:2 src;
     *:2 dst = val;
-    IX = IX + sext(imm8:1);
+    local ixpv:3 = sext(simm8:1);
+    add20(XK, IX, ixpv);
     setNZ16(val); V_flag = 0;
 }
 
 # MOVW EXT to IXP
-:MOVW addr16^","^imm8^",X"  is op8=0x33; imm8; addr16 {
+:MOVW addr16^","^simm8^",X"  is op8=0x33; simm8; addr16 {
     local dst:3 = (zext(XK:1) << 16) | zext(IX:2);
     local bank:1 = EK;
     local src:3 = (zext(bank) << 16) | zext(addr16:2);
     local val:2 = *:2 src;
     *:2 dst = val;
-    IX = IX + sext(imm8:1);
+    local ixpv:3 = sext(simm8:1);
+    add20(XK, IX, ixpv);
     setNZ16(val); V_flag = 0;
 }
 
