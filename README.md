@@ -19,6 +19,13 @@ convention). They layer from bare core to firmware preset:
 
 All three are big-endian, 24-bit (1 MB address space), and share the same compiled `68HC16.sla`.
 
+> **Ghidra-Rare fork.** This branch is verified and maintained as part of
+> [Ghidra-Rare](https://github.com/aleph-void/Ghidra-Rare): differential decode tests against MAME,
+> asl and Motorola MASM output, p-code checked in Ghidra's emulator against the CPU16 Reference
+> Manual, real compiled code, and builds for Ghidra 12.1.3, 12.1.4 and 12.2 (extension name `HC16`).
+> See [`MC68HC16Z3/GHIDRA-RARE.md`](MC68HC16Z3/GHIDRA-RARE.md) for the results, every change made
+> and the remaining limitations, and this fork's Releases page for prebuilt extension zips.
+
 - **Target parts:** MC68HC16Z2 / MC68HC16Z3 (the `.pspec` ships the Z2/Z3 peripheral map)
 - **Status:** in active use on real firmware; see *Profiles & limitations* below.
 
@@ -57,10 +64,13 @@ spec it was created with — its analysis is unaffected. To adopt the JTEC prese
 - **20-bit banked addressing.** The CPU16 forms 20-bit (1 MB) addresses from a 16-bit value plus
   a 4-bit bank/extension register (`EK`, `XK`, `YK`, `ZK`, `SK`, `PK`). Addresses are computed to
   the full 20 bits so Ghidra builds correct cross-references across banks.
-- **Static bank resolution via context.** `EXT16` and Z-indexed modes read the `ctxEK` / `ctxZK`
-  context variables (set in the `.pspec`) at disassembly time, so banked operands resolve to real
-  addresses. This assumes the bank registers are effectively constant in the target firmware (true
-  for JTEC+); see limitations.
+- **Bank registers in the p-code, constant banks for the decompiler.** Every addressing mode uses
+  the live extension fields (`EK` for EXT, `XK`/`YK`/`ZK` for the indexed modes) and adds in 20
+  bits, so a program that changes a bank (`TBEK`, `TBZK`, `TXZ`, `PULM K`...) is followed. The
+  `.pspec` gives `EK` and `ZK` a tracked default (`<tracked_set>`), so the decompiler still sees
+  constant banks and concrete addresses; the `ctxEK` context value sets the bank the listing prints
+  for EXT operands. (Earlier versions resolved `EXT16` and `,Z` from `ctxEK`/`ctxZK` in the p-code,
+  which was wrong whenever the firmware changed EK or ZK.)
 - **Pipeline-relative branches.** Branch targets are computed as `inst_start + 6 + offset` to match
   the CPU16's 3-word instruction prefetch.
 - **Registers** are modeled with their natural sub-register relationships (A/B as halves of D, E:D
@@ -81,7 +91,7 @@ layering from bare core outward:
 | Exception-vector names | ✅ CPU16 table | ✅ + Z2/Z3 `VEC_PICR` | ✅ same | `.pspec` `default_symbols` |
 | Peripheral (MMIO) symbol map | ✖ none | ✅ Z2/Z3 map (from the manual) | ✅ same map | `.pspec` `default_symbols` |
 | I/O register memory blocks | ✖ none | ✅ on-chip blocks | ✅ + `EXT_PERIPH`, `INT_SRAM` | `.pspec` `default_memory_blocks` |
-| Bank context defaults | `ctxEK=0`, `ctxZK=0` | `ctxEK=0`, `ctxZK=0` (reset) | `ctxEK=0`, `ctxZK=15` (JTEC startup) | `.pspec` `<context_data>` |
+| Bank defaults | `EK=0`, `ZK=0` | `EK=0`, `ZK=0` (reset) | `EK=0`, `ZK=15` (JTEC startup) | `.pspec` `<context_data>` (`tracked_set`, `ctxEK`) |
 | Seeded entry points | none | none | `RESET_ENTRY`/`STARTUP`/`IRQ_*` | `.pspec` `default_symbols` |
 | Default calling convention | `__asmcall` (IZ clobbered) | `__asmcall` (IZ clobbered) | `__pcm_default` (IZ preserved) | `.cspec` `<default_proto>` |
 
@@ -104,10 +114,13 @@ JTEC `__pcm_default` is identical except it keeps `IZ` callee-saved (that firmwa
 `__table_2d` as selectable per-function conventions — reassign via right-click → *Edit Function
 Signature* where a routine clearly deviates.
 
-**Modeling notes**: the control instructions `BGND`, `WAI`, and `LPSTOP` lift to distinct opaque
-pseudo-ops (`background_debug()`, `wait_for_interrupt()`, `low_power_stop()`) — accurate for
-disassembly and control flow, though fine-grained side effects (e.g. WAI's context stacking) are
-intentionally not modeled. Immediate/offset operands are pinned to hexadecimal display.
+**Modeling notes**: the control instructions `BGND`, `WAI`, and `LPSTOP` (with S = 0) lift to
+distinct opaque pseudo-ops (`background_debug()`, `wait_for_interrupt()`, `low_power_stop()`): they
+wait for hardware events (background debug mode, an interrupt, a clock restart) that p-code cannot
+express; `LPSTOP` with S = 1 is the NOP the manual describes. Calls, returns, `SWI`, the
+divide-by-zero exception, `PSHM`/`PULM` and the MAC unit follow the CPU16 Reference Manual (checked
+in Ghidra's emulator, see `MC68HC16Z3/GHIDRA-RARE.md`). Immediate/offset operands are pinned to
+hexadecimal display.
 
 ---
 
@@ -115,16 +128,19 @@ intentionally not modeled. Immediate/offset operands are pinned to hexadecimal d
 
 ```
 MC68HC16Z3/
-  data/languages/      SLEIGH spec: .slaspec, .sinc, .ldefs, compiled .sla
+  data/languages/      SLEIGH spec: .slaspec, .sinc (+ its generator), .ldefs, compiled .sla
                        68HC16_cpu16.pspec                    (bare CPU16 core)
                        68HC16.pspec / 68HC16.cspec           (generic Z2/Z3)
                        68HC16_JTEC.pspec / 68HC16_JTEC.cspec (JTEC+ preset)
-  data/GhidraScripts/  helper scripts (see below)
+  ghidra_scripts/      helper scripts (see below)
   data/Manual/         CPU16RM.pdf and MC68HC16ZUM.pdf reference manuals
+  test/                Ghidra-Rare verification suite (see GHIDRA-RARE.md)
+  GHIDRA-RARE.md, CREDITS.md  Ghidra-Rare notes, provenance and the list of changes
 tests/                 disassembly regression harness (see tests/README.md)
 ```
 
-**Helper scripts** (`MC68HC16Z3/data/GhidraScripts/`, run via Ghidra's Script Manager):
+**Helper scripts** (`MC68HC16Z3/ghidra_scripts/`, listed in Ghidra's Script Manager; they lived in
+`data/GhidraScripts/`, which Ghidra does not search):
 
 - **`DisassembleBanks.java`** — disassembles code regions up to the `0xFF` padding boundary, to
   bootstrap analysis of a banked dump. Prompts for the bank ranges and FF-run threshold (defaults
@@ -132,6 +148,9 @@ tests/                 disassembly regression harness (see tests/README.md)
 - **`ApplyRegisterBitEquates.java`** + **`MC68HC16Z3_regs.h`** — apply symbolic bit-mask equates to
   MMIO register accesses (e.g. `SIMCR`, `SYNCR`) for readable peripheral code. Chip-generic to the
   Z2/Z3, so usable on any HC16Z binary.
+- **`HC16GccInlineArgs.java`** — for code built with the GNU hc16 cross compiler (GCC 2.8.1): turns
+  the inline argument words after calls to its runtime routines (`___hc16_mulsi`, `___hc16_udivsi`,
+  ...) into data and sets each call's fall-through past them, instead of phantom instructions.
 
 ---
 
